@@ -1,0 +1,18 @@
+[package]
+name = "bender_rust"
+version = "0.1.0"
+authors = ["rick"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nalgebra = "*"
+petgraph = "*"
+petgraph-evcxr = "*"
+flo_curves = "*"
+geo-booleanop = "*"
+geo="*"
+geojson="0.15.0"
+geo-types="*"
+serde_json="*"
