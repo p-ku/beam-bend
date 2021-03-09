@@ -6,6 +6,7 @@ use geo_booleanop::boolean::BooleanOp;
 use geojson::{Feature, GeoJson, Geometry as JsonGeometry, Value};
 use petgraph::graph::{EdgeIndex, NodeIndex, UnGraph};
 use std::convert::From;
+use std::f32::consts::PI;
 use std::fmt::{Display, Formatter, Result};
 use std::fs::File;
 use std::io::prelude::*;
@@ -98,154 +99,173 @@ impl Section {
         self.graph.remove_edge(ab);
     }
 
-    /*     pub fn build(&self) {
-        let rectangles = self
-            .graph
-            .edge_indices()
-            .map(|edge| match self.graph.edge_endpoints(edge) {
-                Some(nodes) => {
-                    let x1 = self.graph.node_weight(nodes.0).unwrap().x;
-                    let y1 = self.graph.node_weight(nodes.0).unwrap().y;
-                    let x2 = self.graph.node_weight(nodes.1).unwrap().x;
-                    let y2 = self.graph.node_weight(nodes.1).unwrap().y;
-                    let normal1 = normalize(x1, y1, x2, y2);
-                    let normal2 = normalize(x2, y2, x1, y1);
-                    let thickness = self.graph.edge_weight(edge).unwrap().thickness;
-                    let rectangle = polygon![
-                        (
-                            x: x1 + normal1[1] * thickness,
-                            y: y1 - normal1[0] * thickness
-                        ),
-                        (
-                            x: x1 - normal1[1] * thickness,
-                            y: y1 + normal1[0] * thickness
-                        ),
-                        (
-                            x: x2 + normal2[1] * thickness,
-                            y: y2 - normal2[0] * thickness
-                        ),
-                        (
-                            x: x2 - normal2[1] * thickness,
-                            y: y2 + normal2[0] * thickness
-                        ),
-                    ];
-                    /*                     let rectangle = MultiPolygon(vec![rectangle]);
-                     */
-                    /*                     unionized = rectangle.union(&unionized);
-                     */
-                    /*                     rectangles.push(rectangle);
-                     */
-                    rectangle
-                }
-                None => {
-                    println!("No edges");
-                    let huh: Polygon<f32> = polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),];
-                    huh
-                }
-            })
-            .collect::<MultiPolygon<f32>>();
-
-        println!("{:?}", rectangles);
-        let mut unionized: MultiPolygon<f32> = MultiPolygon(vec![
-            polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),],
-            polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),],
-        ]);
-        for poly in rectangles {
-            /*             self.graph.neighbors(node); */
-            unionized = poly.union(&unionized);
-        }
-        let geojson_polygon: JsonGeometry = JsonGeometry::new(Value::from(&unionized));
-
-        let geojson = GeoJson::Feature(Feature {
-            bbox: None,
-            geometry: { Some(geojson_polygon) },
-            id: None,
-            properties: None,
-            foreign_members: None,
-        });
-        let geojson_string = geojson.to_string();
-        /*                     println!("{}", geojson_string); */
-        let path = Path::new("hello.geojson");
-        let display = path.display();
-        let mut file = match File::create(&path) {
-            Err(why) => panic!("couldn't create {}: {}", display, why),
-            Ok(file) => file,
-        };
-        match file.write_all(geojson_string.as_bytes()) {
-            Err(why) => panic!("couldn't write to {}: {}", display, why),
-            Ok(_) => println!("successfully wrote to {}", display),
-        }
-    } */
     pub fn build(&self) {
-        let mut clusters: Vec<Polygon<f32>> = self
+        /*         let point_holder = vec![];
+         */
+        let clusters: Vec<Polygon<f32>> = self
             .graph
             .node_indices()
             .map(|node| {
                 let niter = self.graph.neighbors(node);
-                let mut thick: Vec<f32> = niter
+
+                /*                 let mut npoints: Vec<[f32; 2]> = piter
+                    .map(|neigh| {
+                        [
+                            self.graph.node_weight(neigh).unwrap().x,
+                            self.graph.node_weight(neigh).unwrap().y,
+                        ]
+                    })
+                    .collect();
+                let mut thick: Vec<f32> = thiter
                     .map(|neigh| {
                         self.graph
                             .edge_weight(self.graph.find_edge(node, neigh).unwrap())
                             .unwrap()
                             .thickness
                     })
+                    .collect(); */
+                let mut neiter: Vec<(f32, [f32; 2], [f32; 2], f32, NodeIndex)> = niter
+                    .map(|neigh| {
+                        let x1 = self.graph.node_weight(node).unwrap().x;
+                        let y1 = self.graph.node_weight(node).unwrap().y;
+                        let x2 = self.graph.node_weight(neigh).unwrap().x;
+                        let y2 = self.graph.node_weight(neigh).unwrap().y;
+                        let angle = (y2 - y1 / x2 - x1).atan2(0.);
+                        (
+                            angle,
+                            [x1, y1],
+                            [x2, y2],
+                            self.graph
+                                .edge_weight(self.graph.find_edge(node, neigh).unwrap())
+                                .unwrap()
+                                .thickness,
+                            neigh,
+                        )
+                    })
                     .collect();
-                thick.append(&mut vec![thick[0]]);
-                let niter2 = self.graph.neighbors(node);
+                neiter.append(&mut vec![neiter[0]]);
+                neiter.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                 let mut points = vec![];
-                let mut count: usize = 0;
-
-                for neigh in niter2 {
-                    let edge = self.graph.find_edge(node, neigh).unwrap();
+                println!("{:?}", neiter);
+                for count in 0..(neiter.len() - 1) {
+                    let edge = self.graph.find_edge(node, neiter[count].4).unwrap();
                     let ends = self.graph.edge_endpoints(edge).unwrap();
-                    let t = thick[count];
-                    let t2 = thick[count + 1];
+                    let t = neiter[count].3 / 2.;
+                    let t2 = neiter[count + 1].3 / 2.;
+                    /*                     let x1 = self.graph.node_weight(node).unwrap().x;
+                    let y1 = self.graph.node_weight(node).unwrap().y;
+                    let x2 = self.graph.node_weight(neigh).unwrap().x;
+                    let y2 = self.graph.node_weight(neigh).unwrap().y; */
+                    let x1 = neiter[count].1[0];
+                    let y1 = neiter[count].1[1];
+                    let x2 = neiter[count].2[0];
+                    let y2 = neiter[count].2[1];
+                    let x3 = neiter[count + 1].2[0];
+                    let y3 = neiter[count + 1].2[1];
 
-                    let x1 = self.graph.node_weight(ends.0).unwrap().x;
-                    let y1 = self.graph.node_weight(ends.0).unwrap().y;
-                    let x2 = self.graph.node_weight(ends.1).unwrap().x;
-                    let y2 = self.graph.node_weight(ends.1).unwrap().y;
+                    let midx = (x1 + x2) / 2.;
+                    let midy = (y1 + y2) / 2.;
                     let normal1 = normalize(x1, y1, x2, y2);
-                    let normal2 = normalize((x1 + x2) / 2., (y1 + y2) / 2., x1, y1);
-                    let d = ((t2 * t2 / 4.) - (t * t / 4.)).abs().sqrt();
-                    count += 1;
-                    /*                     println!("1({}, {}) 2({}, {})", x1, y1, x2, y2);
+
+                    let normal2 = [-normal1[0], -normal1[1]];
+                    let normal3 = normalize(x3, y3, x1, y1);
+                    /*                     let normal2 = normalize((x1 + x2) / 2., (y1 + y2) / 2., x1, y1);
                      */
-                    println!("{}", d);
-                    points.append(&mut vec![
-                        (
-                            (normal2[1] - normal2[0]) * t,
-                            (-normal2[0] - normal2[0]) * t,
-                        ),
-                        (
-                            (-normal2[1] - normal2[0]) * t,
-                            (normal2[0] - normal2[0]) * t,
-                        ),
-                        (
-                            normal1[0] * d + normal1[1] * t / 2.,
-                            normal1[1] * d - normal1[0] * t / 2.,
-                        ),
-                    ]);
+                    let d = (t2 * t2 - t * t).abs().sqrt();
+                    /*                     println!("{}", d);
+                     */
+                    println!("1({}, {}) 2({}, {})", x1, y1, x2, y2);
+                    /*                    println!(
+                        "norm 1({}, {}) 2({}, {})",
+                        normal1[0], normal1[1], normal2[0], normal2[1]
+                    ); */
+                    let neigh1 = (
+                        midx + (normal2[1] - normal2[0]) * t,
+                        midy + (-normal2[0] - normal2[1]) * t,
+                    );
+                    let neigh2 = (
+                        midx + (-normal2[1] - normal2[0]) * t,
+                        midy + (normal2[0] - normal2[1]) * t,
+                    );
+
+                    let near1 = (
+                        x1 + (normal1[1] - normal1[0]) * t,
+                        y1 + (-normal1[0] - normal1[1]) * t,
+                    );
+                    let near2 = (
+                        x1 + (normal3[1] + normal3[0]) * t2,
+                        y1 + (-normal3[0] + normal3[1]) * t2,
+                    );
+                    let far = (
+                        x3 + (normal3[1] - normal3[0]) * t2,
+                        y3 + (-normal3[0] - normal3[1]) * t2,
+                    );
+
+                    let one = near1;
+                    let two = neigh2;
+                    let thr = near2;
+                    let fou = far;
+
+                    /*                     if !intersects2([one, two, thr, fou]) {
+                        println!("Lines don't intersect");
+                    } */
+                    let denom =
+                        (one.0 - two.0) * (thr.1 - fou.1) - (one.1 - two.1) * (thr.0 - fou.0);
+                    let part1 = one.0 * two.1 - one.1 * two.0;
+                    let part2 = thr.0 * fou.1 - thr.1 * fou.0;
+                    if self.graph.neighbors(node).count() > 1 {
+                        if (far.1 - near2.1) / (far.0 - near2.0)
+                            != (near1.1 - neigh2.1) / (near1.0 - neigh2.0)
+                        {
+                            let jp = (
+                                (part1 * (thr.0 - fou.0) - (one.0 - two.0) * part2) / denom,
+                                (part1 * (thr.1 - fou.1) - (one.1 - two.1) * part2) / denom,
+                            );
+                            points.append(&mut vec![neigh1, neigh2, jp]);
+                        } else {
+                            points.append(&mut vec![neigh1, neigh2]);
+                        }
+                    } else if self.graph.node_count() < 3 {
+                        let lone1 = (
+                            x1 + (normal1[1] - normal1[0]) * t,
+                            y1 + (-normal1[0] - normal1[1]) * t,
+                        );
+                        let lone2 = (
+                            x1 + (-normal2[1] - normal2[0]) * t,
+                            y1 + (normal2[0] - normal2[1]) * t,
+                        );
+                        let lone3 = (
+                            x2 + (-normal1[1] - normal1[0]) * t,
+                            y2 + (normal1[0] - normal1[1]) * t,
+                        );
+                        let lone4 = (
+                            x2 + (normal2[1] - normal2[0]) * t,
+                            y2 + (-normal2[0] - normal2[1]) * t,
+                        );
+                        points.append(&mut vec![lone1, lone2, lone3, lone4]);
+                    }
                 }
 
+                println!("{:?}", points);
                 Polygon::new(LineString::from(points), vec![])
             })
             .collect();
+        println!("{:?}", clusters.len());
 
-        /*         println!("{:?}", clusters);
-         */
         let mut unionized: MultiPolygon<f32> = MultiPolygon(vec![
             polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),],
             polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),],
         ]);
         /*         let unionized: Polygon<f32> = polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),];
          */
-        for poly in clusters {
-            unionized = poly.union(&unionized);
-        }
-        /*         let test = clusters[5].clone();
-         */
-        let geojson_polygon: JsonGeometry = JsonGeometry::new(Value::from(&unionized));
+        /*         for poly in clusters {
+            match poly {
+                Some(poly) => unionized = poly.union(&unionized),
+                None => {}
+            }
+        } */
+        let test = clusters[4].clone();
+        let geojson_polygon: JsonGeometry = JsonGeometry::new(Value::from(&test));
 
         let geojson = GeoJson::Feature(Feature {
             bbox: None,
@@ -288,12 +308,10 @@ pub fn intersects(section: &Section, node1: NodeIndex, node2: NodeIndex) -> bool
                 y3 = section.graph.node_weight(nodes.0).unwrap().y;
                 x4 = section.graph.node_weight(nodes.1).unwrap().x;
                 y4 = section.graph.node_weight(nodes.1).unwrap().y;
-                let test1 = (x1 - x3) * (y3 - y4)
-                    - (y1 - y3) * (x3 - x4) / (x1 - x2) * (y3 - y4)
-                    - (y1 - y2) * (x3 - x4);
-                let test2 = (x2 - x1) * (y1 - y3)
-                    - (y2 - y1) * (x1 - x3) / (x1 - x2) * (y3 - y4)
-                    - (y1 - y2) * (x3 - x4);
+                let test1 = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4))
+                    / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
+                let test2 = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3))
+                    / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
                 if test1 >= 0.
                     && test1 <= 1.
                     && test2 >= 0.
@@ -308,6 +326,26 @@ pub fn intersects(section: &Section, node1: NodeIndex, node2: NodeIndex) -> bool
             }
             None => println!("No edges."),
         }
+    }
+    false
+}
+pub fn intersects2([(x1, y1), (x2, y2), (x3, y3), (x4, y4)]: [(f32, f32); 4]) -> bool {
+    let test1 = (x1 - x3) * (y3 - y4)
+        - (y1 - y3) * (x3 - x4) / (x1 - x2) * (y3 - y4)
+        - (y1 - y2) * (x3 - x4);
+    let test2 = (x2 - x1) * (y1 - y3)
+        - (y2 - y1) * (x1 - x3) / (x1 - x2) * (y3 - y4)
+        - (y1 - y2) * (x3 - x4);
+    if test1 >= 0.
+        && test1 <= 1.
+        && test2 >= 0.
+        && test2 <= 1.
+        && (x1, y1) != (x3, y3)
+        && (x1, y1) != (x4, y4)
+        && (x2, y2) != (x3, y3)
+        && (x2, y2) != (x4, y4)
+    {
+        return true;
     }
     false
 }
