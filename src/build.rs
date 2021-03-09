@@ -1,16 +1,16 @@
 // Heavily based on https://crates.io/crates/trussx
-use geo::prelude::{Area, Centroid, MapCoords};
-use geo::{polygon, MultiPolygon, Point, Polygon};
+/* use geo::prelude::{Area, Centroid, MapCoords};
+ */
+use geo::{polygon, LineString, MultiPolygon, Point, Polygon};
 use geo_booleanop::boolean::BooleanOp;
-use geo_types::Geometry;
 use geojson::{Feature, GeoJson, Geometry as JsonGeometry, Value};
-use petgraph::graph::{EdgeIndex, EdgeReferences, Neighbors, NodeIndex, NodeReferences, UnGraph};
-use serde_json;
+use petgraph::graph::{EdgeIndex, NodeIndex, UnGraph};
 use std::convert::From;
 use std::fmt::{Display, Formatter, Result};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+
 pub struct Node {
     /// The position of the node
     x: f32,
@@ -98,62 +98,11 @@ impl Section {
         self.graph.remove_edge(ab);
     }
 
-    /*     pub fn build(&self) -> State {
-        let unionized: Polygon<f32>;
-        for edge in self.graph.edge_indices() {
-            match self.graph.edge_endpoints(edge) {
-                Some(nodes) => {
-                    let x1 = self.graph.node_weight(nodes.0).unwrap().x;
-                    let y1 = self.graph.node_weight(nodes.0).unwrap().y;
-                    let x2 = self.graph.node_weight(nodes.1).unwrap().x;
-                    let y2 = self.graph.node_weight(nodes.1).unwrap().y;
-                    let normal1 = normalize(x1, y1, x2, y2);
-                    let normal2 = normalize(x1, y1, x2, y2);
-                    let rectangle = polygon![
-                        (x: normal1[1], y: -normal1[0]),
-                        (x: -normal1[1],y:  normal1[0]),
-                        (x: normal2[1], y: -normal2[0]),
-                        (x: -normal2[1],y:  normal2[0]),
-                    ];
-                    unionized = unionized.union(&rectangle);
-                }
-            }
-        }
-        for node in self.graph.node_indices() {
-            self.graph.neighbors(node);
-        }
-        match unionized.centroid() {
-            Some(points) => State {
-                centroid: points,
-                second_moment_area: 0.2,
-            },
-        }
-    } */
-    pub fn build(&self) {
-        /*         let mut rectangles: Vec<Polygon<f32>> = vec![];
-                let mut new_union: Vec<MultiPolygon<f32>> = vec![];
-                let mut unionized: MultiPolygon<f32>;
-
-                for node in self.graph.node_indices() {
-                    println!("hi");
-                    let x1 = self.graph.node_weight(node).unwrap().x;
-                    let y1 = self.graph.node_weight(node).unwrap().y;
-                    for neighbor in self.graph.neighbors(node) {
-                        let x2 = self.graph.node_weight(neighbor).unwrap().x;
-                        let y2 = self.graph.node_weight(neighbor).unwrap().y;
-                        let normal1 = normalize(x1, y1, x2, y2);
-                        let normal2 = normalize(x1, y1, x2, y2);
-        let boo = self.graph.edge_weight(neighbor);
-                        rectangles.push(polygon![
-                            (x: normal1[1], y: -normal1[0]),
-                            (x: -normal1[1],y:  normal1[0]),
-                            (x: normal2[1], y: -normal2[0]),
-                            (x: -normal2[1],y:  normal2[0]),
-                        ]);
-                    } */
-        let unionized: Polygon<f32>;
-        for edge in self.graph.edge_indices() {
-            match self.graph.edge_endpoints(edge) {
+    /*     pub fn build(&self) {
+        let rectangles = self
+            .graph
+            .edge_indices()
+            .map(|edge| match self.graph.edge_endpoints(edge) {
                 Some(nodes) => {
                     let x1 = self.graph.node_weight(nodes.0).unwrap().x;
                     let y1 = self.graph.node_weight(nodes.0).unwrap().y;
@@ -180,101 +129,144 @@ impl Section {
                             y: y2 + normal2[0] * thickness
                         ),
                     ];
-                    println!("{:?}", rectangle);
-                    let geojson_polygon: JsonGeometry = JsonGeometry::new(Value::from(&rectangle));
-
-                    let geojson = GeoJson::Feature(Feature {
-                        bbox: None,
-                        geometry: { Some(geojson_polygon) },
-                        id: None,
-                        properties: None,
-                        foreign_members: None,
-                    });
-                    let geojson_string = geojson.to_string();
-                    println!("{}", geojson_string);
-                    let path = Path::new("hello.geojson");
-                    let display = path.display();
-                    let mut file = match File::create(&path) {
-                        Err(why) => panic!("couldn't create {}: {}", display, why),
-                        Ok(file) => file,
-                    };
-                    match file.write_all(geojson_string.as_bytes()) {
-                        Err(why) => panic!("couldn't write to {}: {}", display, why),
-                        Ok(_) => println!("successfully wrote to {}", display),
-                    }
+                    /*                     let rectangle = MultiPolygon(vec![rectangle]);
+                     */
+                    /*                     unionized = rectangle.union(&unionized);
+                     */
+                    /*                     rectangles.push(rectangle);
+                     */
+                    rectangle
                 }
-                None => println!("No edges"),
-            }
-        }
-        for node in self.graph.node_indices() {
-            self.graph.neighbors(node);
-        }
-        /*         match unionized.centroid() {
-            Some(points) => State {
-                centroid: points,
-                second_moment_area: 0.2,
-            },
-        } */
-        /*             for i in 1..rectangles.len() {
-            new_union.push(rectangles[i - 1].union(&rectangles[i]));
-            unionized = new_union[0].union(&new_union[i - 1]);
-        } */
-        /*         rectangles.iter().map(|x| println!("{:?}", x));
-        for x in &rectangles {
-            println!("{:?}8", x);
-        } */
-    }
-    /*         let unionized = new_union[0].clone();
-     */
-    /*       let tester = vec![];
-            let unionized2 = unionized.map_coords(&|&(x, y)| (x + 1000., y * 2.));
-    */
-    /*         for node in self.graph.node_indices() {
-        self.graph.neighbors(node);
-    } */
-    /*        let cent = unionized.centroid();
-    match unionized.centroid() {
-        Some(points) => State {
-            centroid: points,
-            second_moment_area: 0.2,
-        },
-    } */
-    /*        let point1 = CoordsIter(unionized);
-     */
-    /*         let point = geo_types::Point::new(2., 9.);
-    let genum = geo_types::Geometry::from(point);
-    assert_eq!(
-        geojson::Value::from(&point),
-        geojson::Value::Point(vec![2., 9.]),
-    );
-    assert_eq!(
-        geojson::Value::from(&genum),
-        geojson::Value::Point(vec![2., 9.]),
-    ); */
-    /*         let unionized = new_union[0];
-     */
-    /*         let multipoly = geo::Geometry::MultiPolygon(unionized);
-    let geojson_polygon: JsonGeometry = JsonGeometry::new(Value::from(&multipoly));
+                None => {
+                    println!("No edges");
+                    let huh: Polygon<f32> = polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),];
+                    huh
+                }
+            })
+            .collect::<MultiPolygon<f32>>();
 
-    let geojson = GeoJson::Feature(Feature {
-        bbox: None,
-        geometry: { Some(geojson_polygon) },
-        id: None,
-        properties: None,
-        foreign_members: None,
-    });
-    let geojson_string = geojson.to_string();
-    println!("{}", geojson_string);
-    let path = Path::new("hello.geojson");
-    let display = path.display();
-    let mut file = match File::create(&path) {
-        Err(why) => panic!("couldn't create {}: {}", display, why),
-        Ok(file) => file,
-    };
-    match file.write_all(geojson_string.as_bytes()) {
-        Err(why) => panic!("couldn't write to {}: {}", display, why),
-        Ok(_) => println!("successfully wrote to {}", display),
+        println!("{:?}", rectangles);
+        let mut unionized: MultiPolygon<f32> = MultiPolygon(vec![
+            polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),],
+            polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),],
+        ]);
+        for poly in rectangles {
+            /*             self.graph.neighbors(node); */
+            unionized = poly.union(&unionized);
+        }
+        let geojson_polygon: JsonGeometry = JsonGeometry::new(Value::from(&unionized));
+
+        let geojson = GeoJson::Feature(Feature {
+            bbox: None,
+            geometry: { Some(geojson_polygon) },
+            id: None,
+            properties: None,
+            foreign_members: None,
+        });
+        let geojson_string = geojson.to_string();
+        /*                     println!("{}", geojson_string); */
+        let path = Path::new("hello.geojson");
+        let display = path.display();
+        let mut file = match File::create(&path) {
+            Err(why) => panic!("couldn't create {}: {}", display, why),
+            Ok(file) => file,
+        };
+        match file.write_all(geojson_string.as_bytes()) {
+            Err(why) => panic!("couldn't write to {}: {}", display, why),
+            Ok(_) => println!("successfully wrote to {}", display),
+        }
     } */
+    pub fn build(&self) {
+        let mut clusters: Vec<Polygon<f32>> = self
+            .graph
+            .node_indices()
+            .map(|node| {
+                let niter = self.graph.neighbors(node);
+                let mut thick: Vec<f32> = niter
+                    .map(|neigh| {
+                        self.graph
+                            .edge_weight(self.graph.find_edge(node, neigh).unwrap())
+                            .unwrap()
+                            .thickness
+                    })
+                    .collect();
+                thick.append(&mut vec![thick[0]]);
+                let niter2 = self.graph.neighbors(node);
+                let mut points = vec![];
+                let mut count: usize = 0;
+
+                for neigh in niter2 {
+                    let edge = self.graph.find_edge(node, neigh).unwrap();
+                    let ends = self.graph.edge_endpoints(edge).unwrap();
+                    let t = thick[count];
+                    let t2 = thick[count + 1];
+
+                    let x1 = self.graph.node_weight(ends.0).unwrap().x;
+                    let y1 = self.graph.node_weight(ends.0).unwrap().y;
+                    let x2 = self.graph.node_weight(ends.1).unwrap().x;
+                    let y2 = self.graph.node_weight(ends.1).unwrap().y;
+                    let normal1 = normalize(x1, y1, x2, y2);
+                    let normal2 = normalize((x1 + x2) / 2., (y1 + y2) / 2., x1, y1);
+                    let d = ((t2 * t2 / 4.) - (t * t / 4.)).abs().sqrt();
+                    count += 1;
+                    /*                     println!("1({}, {}) 2({}, {})", x1, y1, x2, y2);
+                     */
+                    println!("{}", d);
+                    points.append(&mut vec![
+                        (
+                            (normal2[1] - normal2[0]) * t,
+                            (-normal2[0] - normal2[0]) * t,
+                        ),
+                        (
+                            (-normal2[1] - normal2[0]) * t,
+                            (normal2[0] - normal2[0]) * t,
+                        ),
+                        (
+                            normal1[0] * d + normal1[1] * t / 2.,
+                            normal1[1] * d - normal1[0] * t / 2.,
+                        ),
+                    ]);
+                }
+
+                Polygon::new(LineString::from(points), vec![])
+            })
+            .collect();
+
+        /*         println!("{:?}", clusters);
+         */
+        let mut unionized: MultiPolygon<f32> = MultiPolygon(vec![
+            polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),],
+            polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),],
+        ]);
+        /*         let unionized: Polygon<f32> = polygon![(x: 0.,y: 0.),(x: 0.,y: 0.),];
+         */
+        for poly in clusters {
+            unionized = poly.union(&unionized);
+        }
+        /*         let test = clusters[5].clone();
+         */
+        let geojson_polygon: JsonGeometry = JsonGeometry::new(Value::from(&unionized));
+
+        let geojson = GeoJson::Feature(Feature {
+            bbox: None,
+            geometry: { Some(geojson_polygon) },
+            id: None,
+            properties: None,
+            foreign_members: None,
+        });
+        let geojson_string = geojson.to_string();
+        /*                     println!("{}", geojson_string); */
+        let path = Path::new("hello.geojson");
+        let display = path.display();
+        let mut file = match File::create(&path) {
+            Err(why) => panic!("couldn't create {}: {}", display, why),
+            Ok(file) => file,
+        };
+        match file.write_all(geojson_string.as_bytes()) {
+            Err(why) => panic!("couldn't write to {}: {}", display, why),
+            Ok(_) => println!("successfully wrote to {}", display),
+        }
+    }
 }
 pub fn normalize(x0: f32, y0: f32, x1: f32, y1: f32) -> [f32; 2] {
     [
