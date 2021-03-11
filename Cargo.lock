@@ -71,7 +71,6 @@ dependencies = [
  "nalgebra",
  "petgraph",
  "petgraph-evcxr",
- "serde_json",
 ]
 
 [[package]]
